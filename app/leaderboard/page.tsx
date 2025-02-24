@@ -2,19 +2,41 @@
  * @file page.tsx
  * @description
  * This server page displays the Leaderboard, using the getLeaderboardAction from
- * '@/actions/db/leaderboard-actions' to fetch aggregated data. We parse an optional
- * "days" query param, typed locally to avoid collisions with Next's "PageProps" type.
+ * "@/actions/db/leaderboard-actions" to fetch aggregated data. We parse an optional
+ * "days" query param, typed locally to avoid collisions with Next's typical "PageProps".
  *
- * Key points:
- * - We define a local interface "LeaderboardPageProps" to accept { searchParams } as a plain object.
- * - We do NOT import or rely on Next's default "PageProps" to avoid the mismatch "Promise<any>" type.
- * - The aggregator logic is the same as previous code, but with an updated, conflict-free type signature.
+ * Key Points to Fix the Compile Error:
+ * - We removed the custom "LeaderboardPageProps" interface that conflicted with Next 15.1's
+ *   built-in PageProps type requirements.
+ * - Instead, we inline the type for the function parameter, letting Next handle it gracefully.
+ * - This prevents the mismatch "Type '{ days?: string }' is not assignable to 'Promise<any>'" error.
+ *
+ * Flow of Logic:
+ * 1. We parse `days` from searchParams if present, ensuring it's a valid integer > 0 or
+ *    redirecting if it's invalid.
+ * 2. We fetch leaderboard data from getLeaderboardAction(...).
+ * 3. We display the results in a simple table. If there's no data, we note it with a small message.
+ * 4. Users can click "All Time" or "Last 7 Days" to filter results accordingly.
+ *
+ * Example Usage:
+ *  - Access /leaderboard => shows all-time ranking
+ *  - Access /leaderboard?days=7 => shows last 7 days of picks
+ *
+ * @dependencies
+ * - getLeaderboardAction from "@/actions/db/leaderboard-actions" for DB aggregation
+ * - "redirect" from "next/navigation" to handle any invalid query param scenario
+ * - The table UI components from "@/components/ui/table" for rendering
+ *
+ * @notes
+ * - We use React Suspense for demonstration. However, the fetch is direct in the server component.
+ * - This approach is typical in Next.js 13+ server components with dynamic route search params.
  */
 
 "use server"
 
 import React, { Suspense } from "react"
 import { redirect } from "next/navigation"
+
 import { getLeaderboardAction } from "@/actions/db/leaderboard-actions"
 import {
   Table,
@@ -26,35 +48,25 @@ import {
 } from "@/components/ui/table"
 
 /**
- * A local interface for the page props to avoid any conflict with
- * custom or default Next.js "PageProps." This file no longer references
- * Next's "PageProps," preventing the "Promise<any>" mismatch issue.
- */
-interface LeaderboardPageProps {
-  /**
-   * searchParams is an optional object shaped like { days?: string }.
-   * If present, we parse "days" from the query string as an integer.
-   */
-  searchParams?: {
-    days?: string
-  }
-}
-
-/**
  * LeaderboardPage
  *
- * A Next.js 13/15 server component that displays user performance data.
- * We parse ?days=7 if provided, and fetch aggregator results.
+ * Server component that displays aggregated pick data for user picks.
+ * We parse `searchParams?.days` as a potential integer to filter data
+ * over the last N days. If invalid, we redirect back to /leaderboard.
  *
- * @param {LeaderboardPageProps} props - The local page props,
- *   containing searchParams for the query string.
- * @returns A React node representing the leaderboard UI.
+ * The resulting data is shown in a table with columns for userId, picks,
+ * wins, losses, pushes, etc.
+ *
+ * @param {{ searchParams?: { days?: string } }}
+ *   The parameter object automatically provided by Next.js for search queries.
  */
 export default async function LeaderboardPage({
   searchParams
-}: LeaderboardPageProps) {
+}: {
+  searchParams?: { days?: string }
+}) {
   // Safely parse the "?days=7" query param, if present
-  let daysParam: number | undefined
+  let daysParam: number | undefined = undefined
   if (searchParams?.days) {
     const parsed = parseInt(searchParams.days, 10)
     if (isNaN(parsed) || parsed < 1) {
@@ -64,9 +76,10 @@ export default async function LeaderboardPage({
     daysParam = parsed
   }
 
-  // Fetch aggregator result
+  // Fetch aggregator result for the specified timeframe
   const leaderboardResult = await getLeaderboardAction(daysParam)
 
+  // If the aggregator call fails, display an error message
   if (!leaderboardResult.isSuccess) {
     return (
       <div className="p-8 text-center">
@@ -76,6 +89,7 @@ export default async function LeaderboardPage({
     )
   }
 
+  // The aggregator returned data on success
   const data = leaderboardResult.data
   const currentFilter = daysParam ? `${daysParam} Days` : "All Time"
 
@@ -84,6 +98,7 @@ export default async function LeaderboardPage({
       <div className="p-8">
         <h1 className="mb-4 text-center text-2xl font-bold">Leaderboard</h1>
 
+        {/* Simple filter links: All Time vs Last 7 Days */}
         <div className="mb-6 flex justify-center gap-4">
           <a
             href="/leaderboard"
@@ -123,6 +138,7 @@ export default async function LeaderboardPage({
                 <TableHead>Win %</TableHead>
               </TableRow>
             </TableHeader>
+
             <TableBody>
               {data.map((entry, idx) => (
                 <TableRow key={`${entry.userId}_${idx}`}>
