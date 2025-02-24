@@ -27,7 +27,7 @@ export default async function PricingPage() {
       <div className="grid grid-cols-1 gap-8 md:grid-cols-2">
         <PricingCard
           title="Monthly Plan"
-          price="$10"
+          price="$24.99"
           description="Billed monthly"
           buttonText="Subscribe Monthly"
           buttonLink={
@@ -37,7 +37,7 @@ export default async function PricingPage() {
         />
         <PricingCard
           title="Yearly Plan"
-          price="$100"
+          price="$240"
           description="Billed annually"
           buttonText="Subscribe Yearly"
           buttonLink={process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_YEARLY || "#"}
