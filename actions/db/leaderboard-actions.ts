@@ -3,30 +3,18 @@
  * @description
  * Provides a server action for generating and retrieving leaderboard data.
  *
- * The primary action here is `getLeaderboardAction`, which aggregates user picks from the
- * `user_picks` table to produce a basic leaderboard. We can optionally filter by a timeframe
- * (e.g., the last 7 days), then calculate total picks, total wins, total losses, total pushes,
- * and a simple win percentage for each user.
+ * The primary function is `getLeaderboardAction(days?)`, which retrieves
+ * aggregated picks from the `user_picks` table using raw SQL.
  *
- * Key Functions:
- * - getLeaderboardAction(days?: number): Retrieves leaderboard data with optional timeframe.
+ * Type Fix:
+ * - We define a union type `DrizzleResult` representing the possible return
+ *   from `db.execute(...)`. Drizzle can return a single result object or an array.
+ * - This eliminates the “Property 'rows' does not exist on type 'never'.” error.
  *
  * @dependencies
- * - Drizzle: We use `db.execute(sql.raw(...))` to run a raw SQL query for grouping/aggregation.
- * - userPicksTable from "@/db/schema/user-picks-schema"
- * - ActionState from "@/types" to ensure consistent server action return type.
- *
- * @notes
- * - This approach uses a raw SQL query to leverage GROUP BY and sum logic. We parse numeric
- *   fields into `number` in TypeScript before returning the data. Alternatively, we could
- *   retrieve all picks and do JavaScript-based aggregation, but that is less efficient for
- *   large data sets.
- * - The `days` parameter is optional; if provided, it adds a `WHERE created_at > now() - interval 'X days'`
- *   to filter picks within that timeframe.
- * - The query sorts by total wins descending by default, as an example approach.
- * - In real usage, you might want to join with `profilesTable` to retrieve a username or membership status,
- *   or fetch from Clerk directly. This is a bare-bones aggregator for demonstration.
- * - Be mindful of user privacy, ensuring you only display relevant data.
+ * - drizzle-orm for raw SQL execution
+ * - userPicks table from "@/db/schema/user-picks-schema"
+ * - ActionState from "@/types" for typed success/failure states
  */
 
 "use server"
@@ -36,9 +24,32 @@ import { sql } from "drizzle-orm"
 import { ActionState } from "@/types"
 
 /**
- * Represents a single row of aggregated leaderboard data, including
- * the user's ID, total picks, total wins, total losses, total pushes,
- * and a simple winPercentage (wins / totalPicks).
+ * If we do `await db.execute(sql.raw(...))`, Drizzle can return:
+ * - a single object with a `.rows` array (for single statements)
+ * - or an array of objects if multiple statements are in the raw query
+ *
+ * We define these as a union for TypeScript:
+ */
+type SingleDrizzleResult = {
+  rows?: any[]
+  command?: string
+  // Possibly other fields, but we're concerned primarily with .rows
+}
+
+type MultiDrizzleResult = SingleDrizzleResult[]
+
+type DrizzleResult = SingleDrizzleResult | MultiDrizzleResult
+
+/**
+ * Each row from the leaderboard query is shaped like:
+ * {
+ *   user_id: string
+ *   total_picks: string
+ *   total_wins: string
+ *   total_losses: string
+ *   total_pushes: string
+ * }
+ * We'll parse them into numbers and compute a simple ratio (winPercentage).
  */
 export interface LeaderboardEntry {
   userId: string
@@ -51,26 +62,16 @@ export interface LeaderboardEntry {
 
 /**
  * getLeaderboardAction
- * @description
- * Aggregates user picks to form a leaderboard. By default, calculates all-time results.
- * Optionally filters to picks within the last X days if `days` is provided.
+ * Aggregates user picks from `user_picks` by userId, counting total picks, wins, losses, pushes, etc.
  *
- * @param {number} [days] - (Optional) If provided, only picks created in the past `days` days are included.
- * @returns {Promise<ActionState<LeaderboardEntry[]>>} Returns an action state with the leaderboard data or an error message.
- *
- * Example usage:
- * ```ts
- * const result = await getLeaderboardAction(7)
- * if (result.isSuccess) {
- *   console.log(result.data) // array of LeaderboardEntry
- * }
- * ```
+ * @param {number} [days] If provided, filter to picks in the past X days
+ * @returns Promise<ActionState<LeaderboardEntry[]>>
  */
 export async function getLeaderboardAction(
   days?: number
 ): Promise<ActionState<LeaderboardEntry[]>> {
   try {
-    // Construct the base SQL query
+    // 1. Build raw SQL
     let query = `
       SELECT
         user_id,
@@ -80,37 +81,42 @@ export async function getLeaderboardAction(
         SUM(CASE WHEN result = 'push' THEN 1 ELSE 0 END) AS total_pushes
       FROM user_picks
     `
-
-    // If we want to filter by a timeframe
-    if (days) {
-      query += ` WHERE created_at > now() - interval '${days} day' `
+    // If days passed, filter on created_at
+    if (days && days > 0) {
+      query += ` WHERE created_at > NOW() - INTERVAL '${days} days' `
     }
-
-    // Group by user and sort by total wins desc as an example
+    // Group + sort
     query += `
       GROUP BY user_id
-      ORDER BY total_wins DESC;
+      ORDER BY total_wins DESC
     `
 
-    // Execute the raw SQL. We cast the result to an object with .rows
-    const result = await db.execute(sql.raw(query))
-    type Row = {
-      user_id: string
-      total_picks: string
-      total_wins: string
-      total_losses: string
-      total_pushes: string
+    // 2. Execute the query, cast to our union type
+    const result = (await db.execute(sql.raw(query))) as DrizzleResult
+
+    // 3. Extract rawRows from result
+    let rawRows: any[] = []
+
+    // If it's an array, we assume multiple statements. Use first item if it exists
+    if (Array.isArray(result)) {
+      if (result.length > 0 && result[0].rows && Array.isArray(result[0].rows)) {
+        rawRows = result[0].rows
+      }
+    } else {
+      // Single result scenario
+      if (result.rows && Array.isArray(result.rows)) {
+        rawRows = result.rows
+      }
     }
 
-    // Using a type assertion to handle the shape of drizzle's return
-    const { rows } = result as unknown as { rows: Row[] }
-
-    // Convert each row's numeric columns to numbers and compute a simple winPercentage
-    const data = rows.map(row => {
+    // 4. Map the raw rows to typed data
+    const data = rawRows.map(row => {
       const totalPicks = parseInt(row.total_picks, 10)
       const totalWins = parseInt(row.total_wins, 10)
       const totalLosses = parseInt(row.total_losses, 10)
       const totalPushes = parseInt(row.total_pushes, 10)
+
+      const ratio = totalPicks > 0 ? totalWins / totalPicks : 0
 
       return {
         userId: row.user_id,
@@ -118,8 +124,8 @@ export async function getLeaderboardAction(
         totalWins,
         totalLosses,
         totalPushes,
-        winPercentage: totalPicks > 0 ? totalWins / totalPicks : 0
-      }
+        winPercentage: ratio
+      } as LeaderboardEntry
     })
 
     return {
@@ -129,6 +135,9 @@ export async function getLeaderboardAction(
     }
   } catch (error) {
     console.error("Error retrieving leaderboard data:", error)
-    return { isSuccess: false, message: "Failed to retrieve leaderboard data" }
+    return {
+      isSuccess: false,
+      message: "Failed to retrieve leaderboard data"
+    }
   }
 }
