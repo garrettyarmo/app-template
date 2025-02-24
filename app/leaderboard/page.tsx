@@ -1,26 +1,19 @@
 /**
  * @file page.tsx
  * @description
- * A Next.js 13 App Router server component that displays the Leaderboard page.
+ * This server page displays the Leaderboard, using the getLeaderboardAction from
+ * '@/actions/db/leaderboard-actions' to fetch aggregated data. We parse an optional
+ * "days" query param, typed locally to avoid collisions with Next's "PageProps" type.
  *
- * This file fetches leaderboard data (by days) from a server action,
- * then renders a table of user performance.
- *
- * Key Features:
- * 1. Type `searchParams` as a simple object (not a Promise).
- * 2. Aggregate data via getLeaderboardAction from @/actions/db/leaderboard-actions.
- * 3. Validate "days" param to handle invalid or missing queries.
- * 4. Display table or a fallback if there's no data.
- *
- * @notes
- * - We separate layout concerns into layout.tsx, which simply returns children.
- * - This approach resolves compile errors about mismatched searchParams types.
- * - The function is marked async so we can fetch data from server actions (DB).
+ * Key points:
+ * - We define a local interface "LeaderboardPageProps" to accept { searchParams } as a plain object.
+ * - We do NOT import or rely on Next's default "PageProps" to avoid the mismatch "Promise<any>" type.
+ * - The aggregator logic is the same as previous code, but with an updated, conflict-free type signature.
  */
 
 "use server"
 
-import { Suspense } from "react"
+import React, { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { getLeaderboardAction } from "@/actions/db/leaderboard-actions"
 import {
@@ -33,44 +26,48 @@ import {
 } from "@/components/ui/table"
 
 /**
- * Type definition for the searchParams passed to this server page.
- * Next.js provides them as a plain object.
- * In this example, we only care about "days" for optional filtering.
+ * A local interface for the page props to avoid any conflict with
+ * custom or default Next.js "PageProps." This file no longer references
+ * Next's "PageProps," preventing the "Promise<any>" mismatch issue.
  */
-interface LeaderboardSearchParams {
-  days?: string
+interface LeaderboardPageProps {
+  /**
+   * searchParams is an optional object shaped like { days?: string }.
+   * If present, we parse "days" from the query string as an integer.
+   */
+  searchParams?: {
+    days?: string
+  }
 }
 
 /**
- * The server page that renders the leaderboard.
+ * LeaderboardPage
  *
- * @param {object} props The page props passed by Next.js
- * @param {LeaderboardSearchParams} props.searchParams
- *   The object containing query params from the URL, e.g. ?days=7
+ * A Next.js 13/15 server component that displays user performance data.
+ * We parse ?days=7 if provided, and fetch aggregator results.
  *
- * @returns A React node for the UI
+ * @param {LeaderboardPageProps} props - The local page props,
+ *   containing searchParams for the query string.
+ * @returns A React node representing the leaderboard UI.
  */
 export default async function LeaderboardPage({
   searchParams
-}: {
-  searchParams?: LeaderboardSearchParams
-}) {
+}: LeaderboardPageProps) {
   // Safely parse the "?days=7" query param, if present
   let daysParam: number | undefined
   if (searchParams?.days) {
-    // parse as integer
     const parsed = parseInt(searchParams.days, 10)
     if (isNaN(parsed) || parsed < 1) {
-      // redirect to the base route if invalid
+      // If invalid, redirect to base route
       return redirect("/leaderboard")
     }
     daysParam = parsed
   }
 
-  // fetch aggregator result
+  // Fetch aggregator result
   const leaderboardResult = await getLeaderboardAction(daysParam)
+
   if (!leaderboardResult.isSuccess) {
-    // If the aggregator action fails, show an error
     return (
       <div className="p-8 text-center">
         <h1 className="mb-4 text-2xl font-bold">Leaderboard</h1>
@@ -79,7 +76,6 @@ export default async function LeaderboardPage({
     )
   }
 
-  // Data is an array of user performance stats
   const data = leaderboardResult.data
   const currentFilter = daysParam ? `${daysParam} Days` : "All Time"
 
@@ -88,7 +84,6 @@ export default async function LeaderboardPage({
       <div className="p-8">
         <h1 className="mb-4 text-center text-2xl font-bold">Leaderboard</h1>
 
-        {/* Filter Links */}
         <div className="mb-6 flex justify-center gap-4">
           <a
             href="/leaderboard"
@@ -98,7 +93,6 @@ export default async function LeaderboardPage({
           >
             All Time
           </a>
-
           <a
             href="/leaderboard?days=7"
             className={`hover:bg-accent hover:text-accent-foreground rounded-md px-3 py-1 text-sm font-medium ${
