@@ -1,24 +1,21 @@
 /**
  * @file layout.tsx
  * @description
- * A proper layout file for the /leaderboard route.
- * Next.js expects a layout to simply return React nodes for its children.
+ * Provides a layout for /leaderboard route, including the site Header.
  *
  * Key Features:
- * - Declares itself as a server component using "use server" at the top.
- * - Returns the children it wraps in the /leaderboard route.
- *
- * @dependencies
- * - React for JSX usage
- * - This file does not import aggregator logic or searchParams; that logic belongs in page.tsx.
+ * - Imports the global header from @/components/header
+ * - Renders any nested pages below the header
+ * - Ensures consistent layout and styling for the Leaderboard page
  *
  * @notes
- * - This fixes the compile error that occurred due to Next.js expecting a layout signature.
- * - If you want a custom header or common elements for all /leaderboard sub-routes, you can place them here.
+ * - This ensures that the user sees the same top nav as the rest of the site
+ * - "use server" is declared since layout files in Next.js App Router are typically server components
  */
 
 "use server"
-import React from "react"
+
+import Header from "@/components/header"
 
 interface LeaderboardLayoutProps {
   children: React.ReactNode
@@ -36,5 +33,10 @@ interface LeaderboardLayoutProps {
 export default async function LeaderboardLayout({
   children
 }: LeaderboardLayoutProps) {
-  return <div className="min-h-screen w-full">{children}</div>
+  return (
+    <div className="flex min-h-screen flex-col">
+      <Header />
+      <div className="flex-1">{children}</div>
+    </div>
+  )
 }
