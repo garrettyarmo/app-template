@@ -47,39 +47,23 @@ import {
   TableCell
 } from "@/components/ui/table"
 
-/**
- * LeaderboardPage
- *
- * Server component that displays aggregated pick data for user picks.
- * We parse `searchParams?.days` as a potential integer to filter data
- * over the last N days. If invalid, we redirect back to /leaderboard.
- *
- * The resulting data is shown in a table with columns for userId, picks,
- * wins, losses, pushes, etc.
- *
- * @param {{ searchParams?: { days?: string } }}
- *   The parameter object automatically provided by Next.js for search queries.
- */
-export default async function LeaderboardPage({
-  searchParams
-}: {
-  searchParams?: { days?: string }
-}) {
-  // Safely parse the "?days=7" query param, if present
+export default async function LeaderboardPage({ searchParams }: any) {
+  // Because searchParams might be a Promise in Next 15.1, we await it:
+  const actualParams = searchParams ? await searchParams : {}
+
+  // Safely parse "?days=7" if present
   let daysParam: number | undefined = undefined
-  if (searchParams?.days) {
-    const parsed = parseInt(searchParams.days, 10)
+  if (actualParams.days) {
+    const parsed = parseInt(actualParams.days, 10)
     if (isNaN(parsed) || parsed < 1) {
-      // If invalid, redirect to base route
+      // If invalid, redirect to the base route
       return redirect("/leaderboard")
     }
     daysParam = parsed
   }
 
-  // Fetch aggregator result for the specified timeframe
+  // Retrieve leaderboard data
   const leaderboardResult = await getLeaderboardAction(daysParam)
-
-  // If the aggregator call fails, display an error message
   if (!leaderboardResult.isSuccess) {
     return (
       <div className="p-8 text-center">
@@ -89,7 +73,6 @@ export default async function LeaderboardPage({
     )
   }
 
-  // The aggregator returned data on success
   const data = leaderboardResult.data
   const currentFilter = daysParam ? `${daysParam} Days` : "All Time"
 
@@ -97,8 +80,6 @@ export default async function LeaderboardPage({
     <Suspense fallback={<div className="p-4">Loading leaderboard...</div>}>
       <div className="p-8">
         <h1 className="mb-4 text-center text-2xl font-bold">Leaderboard</h1>
-
-        {/* Simple filter links: All Time vs Last 7 Days */}
         <div className="mb-6 flex justify-center gap-4">
           <a
             href="/leaderboard"
@@ -108,6 +89,7 @@ export default async function LeaderboardPage({
           >
             All Time
           </a>
+
           <a
             href="/leaderboard?days=7"
             className={`hover:bg-accent hover:text-accent-foreground rounded-md px-3 py-1 text-sm font-medium ${
@@ -140,7 +122,7 @@ export default async function LeaderboardPage({
             </TableHeader>
 
             <TableBody>
-              {data.map((entry, idx) => (
+              {data.map((entry: any, idx: number) => (
                 <TableRow key={`${entry.userId}_${idx}`}>
                   <TableCell>{entry.userId}</TableCell>
                   <TableCell>{entry.totalPicks}</TableCell>
