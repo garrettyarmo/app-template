@@ -1,13 +1,26 @@
-/*
-<ai_context>
-Configures Next.js for the app.
-</ai_context>
-*/
+/**
+ * @description
+ * This file configures Next.js for the application.
+ * 
+ * Key Features:
+ * - Allows importing images from specified remote domains via the 'images.remotePatterns' setting.
+ * - Currently includes "localhost" and "the-odds-api.com" as example image hosts.
+ * 
+ * @notes
+ * - If you use different sports data sites, replace or add them in the remotePatterns below.
+ */
 
-/** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    remotePatterns: [{ hostname: "localhost" }]
+    remotePatterns: [
+      {
+        hostname: "localhost"
+      },
+      {
+        protocol: "https",
+        hostname: "the-odds-api.com"
+      }
+    ]
   }
 }
 
