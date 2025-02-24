@@ -16,4 +16,5 @@ Exports the database schema for the app.
 
 export * from "./profiles-schema"
 export * from "./todos-schema"
-export * from "./nba-picks-schema" // <-- New export for NBA picks table
+export * from "./nba-picks-schema"
+export * from "./user-picks-schema" // Added for user picks table
