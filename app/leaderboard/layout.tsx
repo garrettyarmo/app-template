@@ -14,47 +14,43 @@
  */
 
 "use server"
-import { Suspense } from "react"
+
 import { redirect } from "next/navigation"
+import { Suspense } from "react"
 import { getLeaderboardAction } from "@/actions/db/leaderboard-actions"
 import {
   Table,
-  TableHeader,
   TableBody,
-  TableRow,
+  TableCell,
   TableHead,
-  TableCell
+  TableHeader,
+  TableRow
 } from "@/components/ui/table"
 
 /**
- * You can rename this interface if you like,
- * but do not call it "SearchParams" to avoid confusion.
+ * Instead of naming a type 'SearchParams', define a quick inline interface,
+ * or rename your type to avoid overshadowing Next's usage.
  */
-interface LeaderboardSearchParams {
-  days?: string
+
+interface LeaderboardPageProps {
+  searchParams?: {
+    days?: string
+  }
 }
 
-/**
- * Leaderboard page server component.
- * Next.js automatically provides 'searchParams'
- * for route queries in the new App Router.
- */
 export default async function LeaderboardPage({
   searchParams
-}: {
-  searchParams?: LeaderboardSearchParams
-}) {
-  // Safely parse "?days=7" if present
+}: LeaderboardPageProps) {
+  // parse ?days=7 if present
   const daysParam = searchParams?.days
     ? parseInt(searchParams.days, 10)
     : undefined
 
-  // If daysParam is invalid, optionally redirect or do fallback:
+  // if daysParam is invalid, optionally redirect or fallback
   if (daysParam !== undefined && (isNaN(daysParam) || daysParam < 1)) {
     return redirect("/leaderboard")
   }
 
-  // Retrieve the data
   const leaderboardResult = await getLeaderboardAction(daysParam)
   if (!leaderboardResult.isSuccess) {
     return (
@@ -72,7 +68,9 @@ export default async function LeaderboardPage({
     <Suspense fallback={<div className="p-4">Loading leaderboard...</div>}>
       <div className="p-8">
         <h1 className="mb-4 text-center text-2xl font-bold">Leaderboard</h1>
+
         <div className="mb-6 flex justify-center gap-4">
+          {/* Link for "All Time" */}
           <a
             href="/leaderboard"
             className={`hover:bg-accent hover:text-accent-foreground rounded-md px-3 py-1 text-sm font-medium ${
@@ -81,6 +79,8 @@ export default async function LeaderboardPage({
           >
             All Time
           </a>
+
+          {/* Link for "Last 7 Days" */}
           <a
             href="/leaderboard?days=7"
             className={`hover:bg-accent hover:text-accent-foreground rounded-md px-3 py-1 text-sm font-medium ${
