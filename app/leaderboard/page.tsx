@@ -1,23 +1,28 @@
 /**
  * @file page.tsx
  * @description
- * A Next.js server component for displaying the Leaderboard page, with proper types for `searchParams`.
+ * A Next.js 13 App Router server component that displays the Leaderboard page.
  *
- * Key Changes to Fix Type Error:
- * - Removed the custom interface `LeaderboardPageProps`.
- * - Instead, we directly type the `searchParams` param as an object with optional `days` string.
- * - This aligns with Next.js App Router standards, fixing the “Type 'Promise<any>'” mismatch.
+ * This file fetches leaderboard data (by days) from a server action,
+ * then renders a table of user performance.
  *
- * Usage:
- * - /leaderboard => All-time
- * - /leaderboard?days=7 => Last 7 days
+ * Key Features:
+ * 1. Type `searchParams` as a simple object (not a Promise).
+ * 2. Aggregate data via getLeaderboardAction from @/actions/db/leaderboard-actions.
+ * 3. Validate "days" param to handle invalid or missing queries.
+ * 4. Display table or a fallback if there's no data.
+ *
+ * @notes
+ * - We separate layout concerns into layout.tsx, which simply returns children.
+ * - This approach resolves compile errors about mismatched searchParams types.
+ * - The function is marked async so we can fetch data from server actions (DB).
  */
 
 "use server"
 
 import { Suspense } from "react"
-import { getLeaderboardAction } from "@/actions/db/leaderboard-actions"
 import { redirect } from "next/navigation"
+import { getLeaderboardAction } from "@/actions/db/leaderboard-actions"
 import {
   Table,
   TableHeader,
@@ -27,29 +32,45 @@ import {
   TableCell
 } from "@/components/ui/table"
 
-// Adjust this type for your actual searchParams usage.
-// If you have more query params, add them here.
-type SearchParams = {
+/**
+ * Type definition for the searchParams passed to this server page.
+ * Next.js provides them as a plain object.
+ * In this example, we only care about "days" for optional filtering.
+ */
+interface LeaderboardSearchParams {
   days?: string
 }
 
+/**
+ * The server page that renders the leaderboard.
+ *
+ * @param {object} props The page props passed by Next.js
+ * @param {LeaderboardSearchParams} props.searchParams
+ *   The object containing query params from the URL, e.g. ?days=7
+ *
+ * @returns A React node for the UI
+ */
 export default async function LeaderboardPage({
   searchParams
 }: {
-  searchParams?: SearchParams
+  searchParams?: LeaderboardSearchParams
 }) {
   // Safely parse the "?days=7" query param, if present
-  const daysParam = searchParams?.days
-    ? parseInt(searchParams.days, 10)
-    : undefined
-
-  if (daysParam !== undefined && (isNaN(daysParam) || daysParam < 1)) {
-    return redirect("/leaderboard") // or handle invalid param with fallback
+  let daysParam: number | undefined
+  if (searchParams?.days) {
+    // parse as integer
+    const parsed = parseInt(searchParams.days, 10)
+    if (isNaN(parsed) || parsed < 1) {
+      // redirect to the base route if invalid
+      return redirect("/leaderboard")
+    }
+    daysParam = parsed
   }
 
+  // fetch aggregator result
   const leaderboardResult = await getLeaderboardAction(daysParam)
-
   if (!leaderboardResult.isSuccess) {
+    // If the aggregator action fails, show an error
     return (
       <div className="p-8 text-center">
         <h1 className="mb-4 text-2xl font-bold">Leaderboard</h1>
@@ -58,6 +79,7 @@ export default async function LeaderboardPage({
     )
   }
 
+  // Data is an array of user performance stats
   const data = leaderboardResult.data
   const currentFilter = daysParam ? `${daysParam} Days` : "All Time"
 
@@ -66,6 +88,7 @@ export default async function LeaderboardPage({
       <div className="p-8">
         <h1 className="mb-4 text-center text-2xl font-bold">Leaderboard</h1>
 
+        {/* Filter Links */}
         <div className="mb-6 flex justify-center gap-4">
           <a
             href="/leaderboard"
@@ -75,6 +98,7 @@ export default async function LeaderboardPage({
           >
             All Time
           </a>
+
           <a
             href="/leaderboard?days=7"
             className={`hover:bg-accent hover:text-accent-foreground rounded-md px-3 py-1 text-sm font-medium ${
