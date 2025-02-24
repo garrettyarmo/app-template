@@ -24,17 +24,25 @@ import postgres from "postgres"
 import { drizzle } from "drizzle-orm/postgres-js"
 
 // Import the table schemas
-import { profilesTable, todosTable, nbaPicksTable } from "@/db/schema"
+import {
+  profilesTable,
+  todosTable,
+  nbaPicksTable,
+  userPicksTable
+} from "@/db/schema"
 
 config({ path: ".env.local" })
 
 /**
- * The schema object.  Map each table to a key for organization:
+ * The schema object. Map each table to a key for organizational convenience.
  */
 const schema = {
   profiles: profilesTable,
   todos: todosTable,
-  nbaPicks: nbaPicksTable
+  nbaPicks: nbaPicksTable,
+
+  // New user picks table
+  userPicks: userPicksTable
 }
 
 /**
