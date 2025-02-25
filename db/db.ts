@@ -1,14 +1,8 @@
-/*
-<ai_context>
-Initializes the database connection and schema for the app.
-</ai_context>
-*/
-
 /**
  * @file db.ts
  * @description
- * This file establishes a connection to the PostgreSQL database and configures
- * Drizzle ORM with all defined tables in the `schema` object.
+ * Establishes a connection to the PostgreSQL database and configures
+ * Drizzle ORM with the defined tables in the `schema` object.
  *
  * Key exports:
  * - db: the Drizzle connection instance
@@ -16,7 +10,8 @@ Initializes the database connection and schema for the app.
  *
  * @notes
  * - We import environment variables from .env.local.
- * - `drizzle` is used here with the Postgres client, referencing the tables in `schema`.
+ * - We rely on drizzle-orm to map the schema for our remaining tables.
+ * - The `user_picks` table is now removed, so references to `userPicksTable` have been deleted.
  */
 
 import { config } from "dotenv"
@@ -27,30 +22,28 @@ import { drizzle } from "drizzle-orm/postgres-js"
 import {
   profilesTable,
   todosTable,
-  nbaPicksTable,
-  userPicksTable
+  nbaPicksTable
+  // userPicksTable has been removed
 } from "@/db/schema"
 
 config({ path: ".env.local" })
 
 /**
- * The schema object. Map each table to a key for organizational convenience.
+ * The schema object, referencing only existing tables.
  */
 const schema = {
   profiles: profilesTable,
   todos: todosTable,
-  nbaPicks: nbaPicksTable,
-
-  // New user picks table
-  userPicks: userPicksTable
+  nbaPicks: nbaPicksTable
+  // userPicks: userPicksTable is removed
 }
 
 /**
- * The Postgres client, referencing your DATABASE_URL from .env.local
+ * Create the Postgres client, referencing the DATABASE_URL from .env.local.
  */
 const client = postgres(process.env.DATABASE_URL!)
 
 /**
- * The Drizzle ORM instance, which we export for direct usage in server actions, etc.
+ * Export the Drizzle ORM instance, referencing our updated schema.
  */
 export const db = drizzle(client, { schema })

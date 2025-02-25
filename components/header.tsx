@@ -4,7 +4,7 @@
  * This client component provides a sticky header for the BadBeats.org application.
  * It includes:
  * - Branding (logo/title)
- * - Navigation links (including AI Picks, My Picks, Leaderboard, etc.)
+ * - Navigation links (including AI Picks, etc.)
  * - Theme switcher
  * - Auth-based actions (sign in/out, user profile button)
  * - A responsive mobile menu
@@ -46,8 +46,6 @@ import { ThemeSwitcher } from "@/components/utilities/theme-switcher"
  */
 const navLinks = [
   { href: "/picks", label: "AI Picks" },
-  { href: "/my-picks", label: "My Picks" },
-  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/about", label: "About" },
   { href: "/pricing", label: "Pricing" },
   { href: "/contact", label: "Contact" }
